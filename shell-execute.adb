@@ -67,6 +67,13 @@ package body Shell.Execute is
       end if;
    end Execute;
    
+   procedure Execute_Piped_Command (Tokens : in Token_Array)
+   is begin 
+      null;
+   end Execute_Piped_Command;
+   
+
+   
    function Is_Parent_Pid (PID : in Process_ID) return Boolean is
    begin
       return Pid > 0;

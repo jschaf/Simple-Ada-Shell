@@ -4,6 +4,8 @@ package Shell.Execute is
    
    procedure Execute (Tokens : in Token_array);
    
+   procedure Execute_Piped_Command (Tokens : in Token_Array);
+   
    subtype Process_ID is Long_Integer;
    
    function Is_Parent_Pid (PID : in Process_ID) return Boolean;

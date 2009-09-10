@@ -35,7 +35,7 @@ package Shell.Tokenizer is
    
    subtype Token_Range is Integer range 0 .. MAX_WORD_LENGTH;
    
-   type Token_Array is array (Token_Range range <>) of Token_Record;
+   type Token_Array is array (Token_Range range <>) of aliased Token_Record;
    
    --  Take in a string and return an array of token_records.  Each
    --  record contains the Token_Type and a Bounded String containing
@@ -49,4 +49,11 @@ package Shell.Tokenizer is
    
    procedure Put_Tokens(Tokens : in Token_Array);
    
+   type Token_Index_Array is array (Token_Range range <>) of Token_Range;
+   
+   function Get_Token_Indices 
+     (Tokens : in Token_Array; 
+      Token  : in Token_Type := T_Bar) 
+     return Token_Index_Array;
+
 end Shell.Tokenizer;

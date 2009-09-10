@@ -14,7 +14,7 @@ with Ada.Text_IO;
 package body Shell.Tokenizer is
    
    package Latin renames Ada.Characters.Latin_1;
-   package T_IO renames Ada.Text_Io;
+   package T_IO renames Ada.Text_IO;
    
    type State is
       (Neutral,      -- Starting state
@@ -170,8 +170,11 @@ package body Shell.Tokenizer is
       return Tokens(Tokens'First..Tokens_Index-1);
    end Tokenize;
    
-   function Group_Word_Tokens (Tokens : in Token_Array;
-                               Start  : in Token_Range) return Token_Array is
+   function Group_Word_Tokens 
+     (Tokens : in Token_Array;
+      Start  : in Token_Range) 
+     return Token_Array 
+   is
       Stop : Token_Range := Start;
    begin 
       for I in Start .. Tokens'Last loop
@@ -188,17 +191,45 @@ package body Shell.Tokenizer is
       T : Token_Record;
    begin 
       T_IO.Put("Token_Array[");
-      for i in Tokens'range loop
+      for I in Tokens'Range loop
          T := Tokens(I);
          T_IO.Put(T.Token'Img & ": " & Bound.To_String(T.Value));
-         if I /= Tokens'last then
+         if I /= Tokens'Last then
             T_IO.Put(", ");
          end if;
       end loop;
       T_IO.Put_Line("]");
    end Put_Tokens;
    
+   function Get_Token_Indices 
+     (Tokens : in Token_Array; 
+      Token  : in Token_Type := T_Bar) 
+     return Token_Index_Array
+   is 
+      function Count_Tokens return Natural is
+         Total : Natural := 0;
+      begin
+         for I in Tokens'Range loop
+            if Tokens(I).Token = Token then
+               Total := Total + 1;
+            end if;
+         end loop;
+         return Total;
+      end Count_Tokens;
+      
+      Length : constant Token_Range := Count_Tokens;
+      Indices : Token_Index_Array(Tokens'First 
+                                      .. Tokens'First + Length - 1);
+      
+      Current_Index : Token_Range := Tokens'First;
+   begin 
+      for I in Tokens'Range loop
+         if Tokens(I).Token = Token then
+            Indices(Current_Index) := I;
+            Current_Index := Current_Index + 1;
+         end if;
+      end loop;
+      return Indices;
+   end Get_Token_Indices;
 
-
-   
 end Shell.Tokenizer;

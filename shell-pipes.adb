@@ -80,8 +80,5 @@ package body Shell.Pipes is
       end if;
    end Execute_To_Pipe;
    
-   procedure Execute_Piped_Command (Tokens : in Tokenizer.Token_Array) is
-   begin
-      null;
-   end Execute_Piped_Command;
+   
 end Shell.Pipes;
