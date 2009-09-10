@@ -4,7 +4,7 @@ with Ada.Exceptions;
 with Shell.Tokenizer;          
 with Shell.Redirection;        
 with Shell.Execute;            
-
+with Shell.Pipes;
 procedure AdaSH is
    
    package T_IO renames Ada.Text_IO;
@@ -32,8 +32,8 @@ begin
          P_ID := Exec.Fork;
          
          if Exec.Is_Child_Pid(P_ID) then
-               Redirect.Set_Redirects(Tokens);
-               Exec.Execute(Tokens);
+            Redirect.Set_Redirects(Tokens);
+            Exec.Execute(Tokens);
          elsif Exec.Is_Parent_Pid(P_ID) then
             Exec.Waitpid(P_ID, 0, 0);
          else
