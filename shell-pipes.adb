@@ -74,7 +74,7 @@ package body Shell.Pipes is
          Duplicate(Source_Descriptor, Target);
          Exec.Execute(Command);
       elsif Exec.Is_Parent_Pid(P_ID) then
-         null;
+         Exec.Waitpid(P_ID, 0, 0);
       else
          raise Fork_Exception with "Unable to create new process.";
       end if;

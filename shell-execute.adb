@@ -1,12 +1,12 @@
 with Ada.Characters.Latin_1;
 with Interfaces.C;
 with Interfaces.C.Strings;
-
+with Shell.Pipes;
 
 package body Shell.Execute is
    
    package Latin renames Ada.Characters.Latin_1;
-   
+   package Pipes renames Shell.Pipes;
    package C renames Interfaces.C;
    
    function C_Fork return Process_ID;
@@ -16,8 +16,6 @@ package body Shell.Execute is
    begin 
       return C_Fork;
    end Fork;
-   
-
    
    procedure C_Waitpid (Pid     : in Process_ID;
                         StatLoc : in Integer;
@@ -58,7 +56,7 @@ package body Shell.Execute is
       return C_Args;
    end To_C_Args;
    
-   procedure Execute (Tokens : in Token_array) is
+   procedure Execute (Tokens : in Token_Array) is
       First_Cmd : Token_Array := Group_Word_Tokens(Tokens, Tokens'First);
       C_Args : C.Strings.Chars_Ptr_Array := To_C_Args(First_Cmd);
    begin
@@ -67,9 +65,100 @@ package body Shell.Execute is
       end if;
    end Execute;
    
-   procedure Execute_Piped_Command (Tokens : in Token_Array)
-   is begin 
-      null;
+
+   
+   procedure Execute_Piped_Command (Tokens : in Token_Array) is 
+      package Tok renames Tokenizer;
+      
+      Pipe_Indices : Tok.Token_Index_Array
+        := Tok.Get_Token_Indices(Tokens, Tok.T_Bar);
+      
+      function Create_Delimits 
+        (Is_Start : Boolean) 
+        return Tok.Token_Index_Array 
+      is
+         Delimits : Tok.Token_Index_Array := Pipe_Indices;
+      begin
+         for I in Delimits'Range loop
+            if Is_Start then
+               Delimits(I) := Delimits(I) - 1;
+            else
+               Delimits(I) := Delimits(I) + 1;
+            end if;
+         end loop;
+         if Is_Start then
+            return Tokens'First & Delimits;
+         else
+            return Delimits & Tokens'Last;
+         end if;
+      end Create_Delimits;
+      
+      
+      Starts : Tok.Token_Index_Array 
+        := Create_Delimits(Is_Start => True);
+      Stops  : Tok.Token_Index_Array
+        := Create_Delimits(Is_Start => False);
+      
+      Malformed_Pipe_Exception : exception;      
+      
+      Start, Stop : Token_Range;
+      
+      
+      procedure Check_Correctness (Tokens        : in Tok.Token_Array;
+                                   Delimit_Index : in Token_Range) is
+         Has_Output_Redirection : Boolean 
+           := (Tok.Contains_Token(Tokens, Tok.T_GT) 
+                 or Tok.Contains_Token(Tokens, Tok.T_GTGT));
+         Has_Input_Redirection : Boolean
+           := Tok.Contains_Token(Tokens, Tok.T_LT);
+      begin
+         if Start > Stop then
+            raise Malformed_Pipe_Exception with "Missing command for pipe.";
+         end if;
+
+         if Delimit_Index /= Starts'First and Has_Input_Redirection then
+            raise Malformed_Pipe_Exception 
+              with ("Piped command cannot have input redirection "
+                      & "(e.g ls | sort -r < file).");
+         end if;
+         
+         if Delimit_Index /= Starts'Last and Has_Output_Redirection then
+            raise Malformed_Pipe_Exception
+              with ("Piped command cannot have output redirection " & 
+                      "except for the last command.");
+         end if;
+      end Check_Correctness;
+
+      Current_Pipe, Last_Pipe : Pipes.Pipe_Descriptor;
+      
+   begin 
+      for I in Starts'Range loop
+         Start := Starts(I);
+         Stop  := Stops(I);
+         
+         declare
+            Piped_Tokens : Tok.Token_Array := Tokens(Start .. Stop);
+         begin
+            Current_Pipe := Pipes.Make_Pipe;
+            Check_Correctness(Piped_Tokens, I);
+            
+            if I = Starts'First then
+               Pipes.Execute_To_Pipe(Piped_Tokens,
+                                     STDOUT_FD, 
+                                     Current_Pipe.Write_End);
+            elsif I = Starts'Last then
+               Pipes.Execute_To_Pipe(Piped_Tokens,
+                                     STDIN_FD, 
+                                     Current_Pipe.Read_End);
+            else
+               Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
+               Pipes.Execute_To_Pipe(Piped_Tokens,
+                                     STDOUT_FD, 
+                                     Current_Pipe.Write_End);
+            end if;
+         end;
+         Last_Pipe := Current_Pipe;
+      end loop;
    end Execute_Piped_Command;
    
 
@@ -84,4 +173,4 @@ package body Shell.Execute is
       return Pid = 0;
    end Is_Child_Pid;
 
-end Shell.execute;
+end Shell.Execute;

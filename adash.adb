@@ -21,6 +21,7 @@ procedure AdaSH is
    
    P_ID : Exec.Process_ID;
 begin
+   
    loop
       Put_Prompt;
       
@@ -32,8 +33,8 @@ begin
          P_ID := Exec.Fork;
          
          if Exec.Is_Child_Pid(P_ID) then
-            Redirect.Set_Redirects(Tokens);
-            Exec.Execute(Tokens);
+            --  Redirect.Set_Redirects(Tokens);
+            Exec.Execute_Piped_Command(Tokens);
          elsif Exec.Is_Parent_Pid(P_ID) then
             Exec.Waitpid(P_ID, 0, 0);
          else
@@ -44,7 +45,7 @@ begin
       exception
          when Error : others =>
             T_IO.Put_Line(T_IO.Standard_Error, 
-                          Except.Exception_Message(Error));
+                          Except.Exception_Information(Error));
 
       end Execute_Command;
       

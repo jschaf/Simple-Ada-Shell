@@ -35,7 +35,7 @@ package Shell.Tokenizer is
    
    subtype Token_Range is Integer range 0 .. MAX_WORD_LENGTH;
    
-   type Token_Array is array (Token_Range range <>) of aliased Token_Record;
+   type Token_Array is array (Token_Range range <>) of Token_Record;
    
    --  Take in a string and return an array of token_records.  Each
    --  record contains the Token_Type and a Bounded String containing
@@ -44,8 +44,10 @@ package Shell.Tokenizer is
    
    --  Given tokens and a start index, return a contigous slice of the
    --  array containing only word tokens, starting at start.
-   function Group_Word_Tokens (Tokens : in Token_Array;
-                               Start  : in Token_Range) return Token_Array;
+   function Group_Word_Tokens 
+     (Tokens : in Token_Array;
+      Start  : in Token_Range)
+     return Token_Array;
    
    procedure Put_Tokens(Tokens : in Token_Array);
    
@@ -55,5 +57,10 @@ package Shell.Tokenizer is
      (Tokens : in Token_Array; 
       Token  : in Token_Type := T_Bar) 
      return Token_Index_Array;
-
+   
+   function Contains_Token 
+     (Tokens : in Token_Array; 
+      Search_Token  : in Token_Type) 
+     return Boolean;
+   
 end Shell.Tokenizer;

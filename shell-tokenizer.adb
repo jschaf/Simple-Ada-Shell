@@ -231,5 +231,21 @@ package body Shell.Tokenizer is
       end loop;
       return Indices;
    end Get_Token_Indices;
+   
+   function Contains_Token 
+     (Tokens       : in Token_Array; 
+      Search_Token : in Token_Type) 
+     return Boolean
+   is 
+   begin 
+      for i in Tokens'range loop
+         if Tokens(I).Token = Search_Token then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Contains_Token;
+   
 
+   
 end Shell.Tokenizer;
