@@ -1,3 +1,6 @@
+with Ada.Text_IO;               --  DEBUG
+use Ada.Text_IO;                --  DEBUG
+
 with Ada.Characters.Latin_1;
 with Interfaces.C;
 with Interfaces.C.Strings;
@@ -65,7 +68,8 @@ package body Shell.Execute is
       end if;
    end Execute;
    
-
+   
+   
    
    procedure Execute_Piped_Command (Tokens : in Token_Array) is 
       package Tok renames Tokenizer;
@@ -77,22 +81,33 @@ package body Shell.Execute is
         (Is_Start : Boolean) 
         return Tok.Token_Index_Array 
       is
-         Delimits : Tok.Token_Index_Array := Pipe_Indices;
       begin
-         for I in Delimits'Range loop
+         if Tokens'Length = 0 then
+            return Pipe_Indices(1..0);
+         end if;
+         
+         for I in Pipe_Indices'Range loop
             if Is_Start then
-               Delimits(I) := Delimits(I) - 1;
+               Pipe_Indices(I) := Pipe_Indices(I) + 1;
             else
-               Delimits(I) := Delimits(I) + 1;
+               Pipe_Indices(I) := Pipe_Indices(I) - 2;
             end if;
          end loop;
          if Is_Start then
-            return Tokens'First & Delimits;
+            return Tokens'First & Pipe_Indices;
          else
-            return Delimits & Tokens'Last;
+            return Pipe_Indices & Tokens'Last;
          end if;
       end Create_Delimits;
       
+      procedure Put_Delimits (T : in Tok.Token_Index_Array) is
+      begin
+         Put("Token_Index_Array[");
+         for i in T'range loop
+            Put(T(I)'Img & ", ");
+         end loop;
+         Put_Line("]");
+      end Put_Delimits;
       
       Starts : Tok.Token_Index_Array 
         := Create_Delimits(Is_Start => True);
@@ -105,7 +120,8 @@ package body Shell.Execute is
       
       
       procedure Check_Correctness (Tokens        : in Tok.Token_Array;
-                                   Delimit_Index : in Token_Range) is
+                                   Delimit_Index : in Token_Range) 
+      is
          Has_Output_Redirection : Boolean 
            := (Tok.Contains_Token(Tokens, Tok.T_GT) 
                  or Tok.Contains_Token(Tokens, Tok.T_GTGT));
@@ -132,6 +148,9 @@ package body Shell.Execute is
       Current_Pipe, Last_Pipe : Pipes.Pipe_Descriptor;
       
    begin 
+      Put("Pipes:  "); Put_Delimits(Pipe_Indices);
+      Put("Starts: "); Put_Delimits(Starts);
+      Put("Stops:  "); Put_Delimits(Stops);
       for I in Starts'Range loop
          Start := Starts(I);
          Stop  := Stops(I);
@@ -143,14 +162,17 @@ package body Shell.Execute is
             Check_Correctness(Piped_Tokens, I);
             
             if I = Starts'First then
+               Put_Line("First Part");
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDOUT_FD, 
                                      Current_Pipe.Write_End);
             elsif I = Starts'Last then
+               Put_Line("Second Part");
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDIN_FD, 
                                      Current_Pipe.Read_End);
             else
+               Put_Line("Third Part");
                Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDOUT_FD, 

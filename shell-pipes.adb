@@ -2,6 +2,7 @@ with Interfaces.C;
 with Interfaces.C.Strings;
 with Shell.Redirection;
 with Shell.Execute;
+with Shell.Errors;
 
 package body Shell.Pipes is
    
@@ -39,6 +40,7 @@ package body Shell.Pipes is
    begin 
       New_FD := -1;
       if C_Dup2(Old_FD, New_FD) = -1 then
+         T_IO.Put_Line(Errors.String_Error(Errors.Last_Error));
          raise Duplicate_Exception with "Unable to duplicate.";
       end if;         
    end Duplicate;
@@ -63,6 +65,7 @@ package body Shell.Pipes is
       Check_For_Words:
       for i in Tokens'Range loop
          if Tokens(I).Token /= Tokenizer.T_Word then
+            Tokenizer.Put_Tokens(Tokens); --  DEBUG
             raise Bad_Token_Exception 
               with ("Cannot execute command with" & 
                     " anything other than word tokens.");
