@@ -1,17 +1,21 @@
-with Ada.Text_IO;               --  DEBUG
-use Ada.Text_IO;                --  DEBUG
-
 with Ada.Characters.Latin_1;
+
 with Interfaces.C;
 with Interfaces.C.Strings;
+
 with Shell.Pipes;
+with Shell.Redirection;
 
 package body Shell.Execute is
 
    package Latin renames Ada.Characters.Latin_1;
-   package Pipes renames Shell.Pipes;
-   package C renames Interfaces.C;
 
+   package C renames Interfaces.C;
+   
+   package Tok renames Tokenizer;
+   use type Tok.Token_Index_Array;
+   use type Tok.Token_Type;
+   
    function C_Fork return Process_ID;
    pragma Import (C, C_Fork, "fork");
 
@@ -38,173 +42,177 @@ package body Shell.Execute is
    pragma Import(C, Execvp, "execvp");
 
    function To_C_Args
-     (Args : in Token_Record_Array)
+     (Args : in Tok.Token_Record_Array)
      return C.Strings.Chars_Ptr_Array
    is
+      
       Default_String : String := Ada.Characters.Latin_1.Nul'Img;
+      
       C_Start : C.Size_T := C.Size_T(Args'First);
       C_End   : C.Size_T := C.Size_T(Integer'Max(Args'First, Args'Last + 1));
       C_Index : C.Size_T := C_Start;
+      
       C_Args  : C.Strings.Chars_Ptr_Array(C_Start .. C_End)
         := (others => C.Strings.New_String(Default_String));
 
-      Arg : Bound.Bounded_String;
+      Arg : Tok.Bound.Bounded_String;
    begin
+      
       for I in Args'Range loop
          Arg := Args(I).Value;
          C_Index := C.Size_T(I);
-         C_Args(C_Index) := C.Strings.New_String(Bound.To_String(Arg));
+         C_Args(C_Index) := C.Strings.New_String(Tok.Bound.To_String(Arg));
       end loop;
+      
       C_Args(C_Args'Last) := C.Strings.Null_Ptr;
       return C_Args;
+      
    end To_C_Args;
 
-   procedure Execute (Tokens : in Token_Record_Array) is
-      First_Cmd : Token_Record_Array := Group_Word_Tokens(Tokens, Tokens'First);
-      C_Args : C.Strings.Chars_Ptr_Array := To_C_Args(First_Cmd);
+   procedure Execute (Tokens : in Tok.Token_Record_Array) is
+      
+      Words : Tok.Token_Record_Array 
+        := Tok.Group_Word_Tokens(Tokens, Tokens'First);
+      
+      C_Args : C.Strings.Chars_Ptr_Array := To_C_Args(Words);
+      
    begin
+      
       if Tokens'First <= Tokens'Last then
+         Redirection.Set_Redirects(Tokens);
          Execvp(C_Args(C_Args'First), C_Args);
       end if;
+      
    end Execute;
 
-   procedure Execute_Piped_Command (Tokens : in Token_Record_Array) is
-      package Tok renames Tokenizer;
-
-      Pipe_Indices : Tok.Token_Index_Array
-        := Tok.Get_Token_Indices(Tokens, Tok.T_Bar);
-
-      function Create_Delimits
-        (Is_Start : Boolean)
-        return Tok.Token_Index_Array
-      is
-      begin
-         if Tokens'Length = 0 then
-            return Pipe_Indices(1..0);
-         end if;
-
-         for I in Pipe_Indices'Range loop
-            if Is_Start then
-               Pipe_Indices(I) := Pipe_Indices(I) + 1;
-            else
-               Pipe_Indices(I) := Pipe_Indices(I) - 2;
-            end if;
-         end loop;
-         if Is_Start then
-            return Tokens'First & Pipe_Indices;
-         else
-            return Pipe_Indices & Tokens'Last;
-         end if;
-      end Create_Delimits;
-
-      procedure Put_Delimits (T : in Tok.Token_Index_Array) is
-      begin
-         Put("Token_Index_Array[");
-         for I in T'Range loop
-            Put(T(I)'Img & ", ");
-         end loop;
-         Put_Line("]");
-      end Put_Delimits;
-
-      Starts : Tok.Token_Index_Array
-        := Create_Delimits(Is_Start => True);
-      Stops  : Tok.Token_Index_Array
-        := Create_Delimits(Is_Start => False);
+   procedure Execute_Piped_Command (Tokens : in Tok.Token_Record_Array) is
 
       Malformed_Pipe_Exception : exception;
 
-      Start, Stop : Token_Range;
-
-
-      procedure Check_Correctness (Tokens        : in Tok.Token_Record_Array;
-                                   Delimit_Index : in Token_Range)
+      type Position_Type is (First, Middle, Last);
+      
+      
+      procedure Check_Correctness (Tokens   : in Tok.Token_Record_Array;
+                                   Position : in Position_Type)
       is
          Has_Output_Redirection : Boolean
-           := (Tok.Contains_Token(Tok.T_GT, Tokens)
+           :=      (Tok.Contains_Token(Tok.T_GT,   Tokens)
                  or Tok.Contains_Token(Tok.T_GTGT, Tokens));
+         
          Has_Input_Redirection : Boolean
            := Tok.Contains_Token(Tok.T_LT, Tokens);
+         
       begin
-         if Start > Stop then
-            raise Malformed_Pipe_Exception with "Missing command for pipe.";
+         
+
+         if Position /= First and Has_Input_Redirection then
+            raise Malformed_Pipe_Exception
+              with ("Only the first pipe command can have input redirection.");
          end if;
 
-         if Delimit_Index /= Starts'First and Has_Input_Redirection then
+         if Position /= Last and Has_Output_Redirection then
             raise Malformed_Pipe_Exception
-              with ("Piped command cannot have input redirection "
-                      & "(e.g ls | sort -r < file).");
+              with ("Only the last pipe command can have output redirection.");
          end if;
-
-         if Delimit_Index /= Starts'Last and Has_Output_Redirection then
-            raise Malformed_Pipe_Exception
-              with ("Piped command cannot have output redirection " &
-                      "except for the last command.");
-         end if;
+         
       end Check_Correctness;
+      
+      Stripped_Tokens : Tok.Token_Array        
+        := Tok.Strip_Token_Strings(Tokens);
+      
+      Separator : constant Tok.Token_Array := (1 => Tok.T_Bar);
+      Slices    : Tok.Split.Slice_Set;
 
       Current_Pipe, Last_Pipe : Pipes.Pipe_Descriptor := Pipes.Make_Pipe;
+      
+      First_Slice : constant Natural := 1;
+      Last_Slice : Natural;
+      
+      procedure Check_Tokens is
+      begin
+         if Tokens(Tokens'First).Token = Tok.T_Bar then
+            raise Malformed_Pipe_Exception
+              with "Cannot begin a command with a pipe.";
+         end if;
+         
+         if Tokens(Tokens'Last).Token = Tok.T_Bar then
+            raise Malformed_Pipe_Exception
+              with "Cannot end a command with a pipe.";
+         end if;
+            
+         for I in Tokens'Range loop
+            if I + 1 in Tokens'Range 
+              and then Tokens(I).Token = Tok.T_Bar
+              and then Tokens(I).Token = Tokens(I+1).Token
+            then
+               raise Malformed_Pipe_Exception
+                 with "Cannot have two adjacent pipes.";
+            end if;
+         end loop;
+      end Check_Tokens;
 
+      
    begin
-      Put("Pipes:  "); Put_Delimits(Pipe_Indices);
-      Put("Starts: "); Put_Delimits(Starts);
-      Put("Stops:  "); Put_Delimits(Stops);
-      for I in Starts'Range loop
-         Start := Starts(I);
-         Stop  := Stops(I);
+      
+      Check_Tokens;
+      
+      Current_Pipe := Pipes.Make_Pipe;
 
-         declare
-            Piped_Tokens : Tok.Token_Record_Array := Tokens(Start .. Stop);
+      
+      Tok.Split.Create(S          => Slices,
+                       From       => Stripped_Tokens,
+                       Separators => Separator);
+      
+      Last_Slice := Natural(Tok.Split.Slice_Count(Slices));
+      
+      for I in First_Slice .. Last_Slice loop
+         
+         declare           
+            
+            Piped_Tokens : Tok.Token_Record_Array
+              := Tok.Get_Token_Strings(Slices, I, Tokens);
+            
          begin
-            Current_Pipe := Pipes.Make_Pipe;
-            Check_Correctness(Piped_Tokens, I);
-
-            if I = Starts'First then
-               Put_Line("First Part");
+            
+            if I = First_Slice then
+               Check_Correctness(Piped_Tokens, First);
+               
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDOUT_FD,
                                      Current_Pipe.Write_End);
-            elsif I = Starts'Last then
-               Put_Line("Second Part");
+            elsif I = Last_Slice then
+               Check_Correctness(Piped_Tokens, Last);
+               
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDIN_FD,
                                      Current_Pipe.Read_End);
+
             else
-               Put_Line("Third Part");
+               Check_Correctness(Piped_Tokens, Middle);
+               
                Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
                Pipes.Execute_To_Pipe(Piped_Tokens,
                                      STDOUT_FD,
                                      Current_Pipe.Write_End);
             end if;
+            Last_Pipe := Current_Pipe;
          end;
-         Last_Pipe := Current_Pipe;
       end loop;
+
    end Execute_Piped_Command;
 
    
    procedure Execute (Command_String : in String) is 
       
-      Tokens          : Token_Record_Array := Tokenize(Command_String);
-      Stripped_Tokens : Token_Array        := Strip_Token_Strings(Tokens);
-      
-      Separator    : Token_Array := (1 => T_Bar);
-      Slices : Split.Slice_Set;
+      Tokens   : Tok.Token_Record_Array := Tok.Tokenize(Command_String);
 
    begin 
-      Split.Create(S          => Slices,
-                   From       => Stripped_Tokens,
-                   Separators => Separator);
       
-      for I in 1 .. Split.Slice_Count(Slices) loop
-         declare
-            Cmd_Info : Token_Record_Array
-              := Get_Token_Strings(Slices, Integer(I), Tokens);
-         begin
-            Put_Line("Executing: ");
-            Put_Tokens(Cmd_Info);
-            --  Execute(Cmd_Info);            
-         end;
-      end loop;
-
+      if Tok.Contains_Token(Tok.T_Bar, Tokens) then
+         Execute_Piped_Command(Tokens);
+      else
+         Execute(Tokens);
+      end if;
    end Execute;
    
    

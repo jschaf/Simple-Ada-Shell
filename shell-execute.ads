@@ -1,12 +1,12 @@
-with Shell.Tokenizer; use Shell.Tokenizer;
+with Shell.Tokenizer;
 
 package Shell.Execute is
    
    procedure Execute (Command_String : in String);
    
-   procedure Execute (Tokens : in Token_Record_Array);
+   procedure Execute (Tokens : in Tokenizer.Token_Record_Array);
 
-   procedure Execute_Piped_Command (Tokens : in Token_Record_Array);
+   procedure Execute_Piped_Command (Tokens : in Tokenizer.Token_Record_Array);
 
    subtype Process_ID is Long_Integer;
 

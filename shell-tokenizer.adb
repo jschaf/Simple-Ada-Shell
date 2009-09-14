@@ -215,12 +215,13 @@ package body Shell.Tokenizer is
       T_IO.Put("Token_Array[");
       for I in Tokens'Range loop
          T := Tokens(I);
-         T_IO.Put(T.Token'Img & ": " & Bound.To_String(T.Value));
+         T_IO.Put(T_IO.Standard_Error, 
+                  T.Token'Img & ": " & Bound.To_String(T.Value));
          if I /= Tokens'Last then
-            T_IO.Put(", ");
+            T_IO.Put(T_IO.Standard_Error, ", ");
          end if;
       end loop;
-      T_IO.Put_Line("]");
+      T_IO.Put_Line(T_IO.Standard_Error, "]");
    end Put_Tokens;
    
 

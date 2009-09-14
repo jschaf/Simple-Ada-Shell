@@ -81,22 +81,15 @@ begin
       Put_Prompt;
       
       declare
+         Cmd_String : String := T_IO.Get_Line;
+         
          Tokens : Tokenizer.Token_Record_Array
-           := Tokenizer.Tokenize(T_IO.Get_Line);
+           := Tokenizer.Tokenize(Cmd_String);
       begin
-         --  T_IO.Put_Line("Testing: " & Tests(I).all);
-         --  T_IO.Put_Line("==============================");
-         --  T_IO.New_Line;
-         --  P_ID := Exec.Fork;
-
-         --  T_IO.Put("Tokens: ");
-         --  Tokenizer.Put_Tokens(Tokens);
-
          P_ID := Exec.Fork;
 
          if Exec.Is_Child_Pid(P_ID) then
-            Redirect.Set_Redirects(Tokens);
-            Exec.Execute_Piped_Command(Tokens);
+            Exec.Execute(Cmd_String);
          elsif Exec.Is_Parent_Pid(P_ID) then
             Exec.Waitpid(P_ID, 0, 0);
          else
@@ -107,7 +100,7 @@ begin
       exception
          when Error : others =>
             T_IO.Put_Line(T_IO.Standard_Error,
-                          Except.Exception_Information(Error));
+                          Except.Exception_Message(Error));
 
       end;
       T_IO.New_Line;
