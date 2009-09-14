@@ -188,7 +188,6 @@ package body Shell.Execute is
       
       Separator    : Token_Array := (1 => T_Bar);
       Slices : Split.Slice_Set;
-      
 
    begin 
       Split.Create(S          => Slices,
@@ -197,13 +196,12 @@ package body Shell.Execute is
       
       for I in 1 .. Split.Slice_Count(Slices) loop
          declare
-
             Cmd_Info : Token_Record_Array
               := Get_Token_Strings(Slices, Integer(I), Tokens);
          begin
             Put_Line("Executing: ");
             Put_Tokens(Cmd_Info);
-            Execute(Cmd_Info);            
+            --  Execute(Cmd_Info);            
          end;
       end loop;
 

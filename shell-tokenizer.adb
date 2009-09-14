@@ -10,12 +10,13 @@
 
 with Ada.Characters.Latin_1;
 with Ada.Text_IO;
-
+with Ada.Integer_Text_IO;
 package body Shell.Tokenizer is
 
    package Latin renames Ada.Characters.Latin_1;
    package T_IO renames Ada.Text_IO;
-
+   package IT_IO renames Ada.Integer_Text_IO;
+   
    type State is
       (Neutral,      -- Starting state
        InWord,       -- Accumulating characters in a word
@@ -313,16 +314,32 @@ package body Shell.Tokenizer is
    is 
       Sep_Indexes : Split.Separators_Indexes
         := Split.Separators(S);
-      Start : Positive := Sep_Indexes(Positive(S_Index));
-      Stop  : Positive := Sep_Indexes(Positive(S_Index + 1));      
+      Start : Positive;
+      Stop  : Positive;
    begin 
+      if Sep_Indexes'Length = 0 then
+         Start := Tokens_Info'First;
+         Stop  := Tokens_Info'Last;
+         
+      elsif S_Index = 1 then
+         Start := Tokens_Info'First;
+         Stop  := Sep_Indexes(Positive(1)) - 1;
+         
+      elsif S_Index = Integer(Split.Slice_Count(S)) then
+         Start := Sep_Indexes(Sep_Indexes'Last) + 1;
+         Stop  := Tokens_Info'Last;
+         
+      else
+         Start := Sep_Indexes(Positive(S_Index) - 1) + 1;
+         Stop  := Sep_Indexes(Positive(S_Index)) - 1;
+      end if;
       return Tokens_Info(Start .. Stop);
-   end get_Token_Strings;
+   end Get_Token_Strings;
    
    function To_String (Tokens : in Token_Record_Array) return String is
       S : String := "";
    begin 
-      for i in Tokens'range loop
+      for I in Tokens'Range loop
          S := S & Bound.To_String(Tokens(I).Value);
       end loop;
       return S;
