@@ -1,7 +1,9 @@
 with Shell.Tokenizer; use Shell.Tokenizer;
 
 package Shell.Execute is
-
+   
+   procedure Execute (Command_String : in String);
+   
    procedure Execute (Tokens : in Token_Record_Array);
 
    procedure Execute_Piped_Command (Tokens : in Token_Record_Array);

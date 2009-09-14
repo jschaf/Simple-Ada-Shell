@@ -38,8 +38,7 @@ package body Shell.Tokenizer is
 
       Tokens        : Token_Record_Array(Token_Range'Range);
       Tokens_Index  : Token_Range := Tokens'First;
-
-
+      
       procedure Update_Tokens (Token : in Token_Type;
                                Value : in Character) is
       begin
@@ -169,7 +168,30 @@ package body Shell.Tokenizer is
       --  Get_Line to get input, it does not give a closing New_Line.
       return Tokens(Tokens'First..Tokens_Index-1);
    end Tokenize;
+   
+   
+   function Strip_Token_Strings 
+     (Tokens : in Token_Record_Array) 
+     return Token_Array
+   is
+      Empty_Tokens : Token_Array(Tokens'Range);
+   begin 
+      for I in Empty_Tokens'Range loop
+         Empty_Tokens(I) := Tokens(I).Token;
+      end loop;
+      return Empty_Tokens;
+   end Strip_Token_Strings;
+   
+   function Tokenize_No_Strings 
+     (Token_String : in String) 
+     return Token_Array 
+   is
+      Full_Tokens : Token_Record_Array := Tokenize(Token_String);
+   begin
+      return Strip_Token_Strings(Full_Tokens);
+   end Tokenize_No_Strings;
 
+   
    function Group_Word_Tokens
      (Tokens : in Token_Record_Array;
       Start  : in Token_Range)
@@ -200,7 +222,24 @@ package body Shell.Tokenizer is
       end loop;
       T_IO.Put_Line("]");
    end Put_Tokens;
+   
 
+   procedure Put_Tokens(Tokens : in Token_Array) is
+      T : Token_Type;
+   begin
+      T_IO.Put("Token_Array[");
+      for I in Tokens'Range loop
+         T := Tokens(I);
+         T_IO.Put(T'Img);
+         if I /= Tokens'Last then
+            T_IO.Put(", ");
+         end if;
+      end loop;
+      T_IO.Put_Line("]");
+   end Put_Tokens;
+
+
+   
    function Get_Token_Indices
      (Tokens : in Token_Record_Array;
       Token  : in Token_Type := T_Bar)
@@ -233,17 +272,75 @@ package body Shell.Tokenizer is
    end Get_Token_Indices;
 
    function Contains_Token
-     (Tokens       : in Token_Record_Array;
-      Search_Token : in Token_Type)
+     (Token     : in Token_Type;
+      Set_Token : in Token_Set)
      return Boolean
    is
    begin
-      for i in Tokens'range loop
-         if Tokens(I).Token = Search_Token then
+      return Set_Token(Token);
+   end Contains_Token;
+   
+   function Contains_Token
+     (Token  : in Token_Type;
+      Tokens : in Token_Record_Array)
+     return Boolean
+   is begin 
+      for I in Tokens'Range loop
+         if Token = Tokens(I).Token then
             return True;
          end if;
       end loop;
       return False;
    end Contains_Token;
+   
+   function Array_To_Set (Tokens : in Token_Array) return Token_Set is
+      Set : Token_Set := (others => False);
+   begin 
+      for I in Tokens'Range loop
+         Set(Tokens(I)) := True;
+      end loop;
+      return Set;
+   end Array_To_Set;
+   
+   
+   function Get_Token_Strings 
+     (S           : in Split.Slice_Set;
+      S_Index     : in Integer; 
+      Tokens_Info : in Token_Record_Array) 
+     return Token_Record_Array
+   is 
+      Sep_Indexes : Split.Separators_Indexes
+        := Split.Separators(S);
+      Start : Positive;
+      Stop  : Positive;
+   begin 
+      if Sep_Indexes'Length = 0 then
+         Start := Tokens_Info'First;
+         Stop  := Tokens_Info'Last;
+         
+      elsif S_Index = 1 then
+         Start := Tokens_Info'First;
+         Stop  := Sep_Indexes(Positive(1)) - 1;
+         
+      elsif S_Index = Integer(Split.Slice_Count(S)) then
+         Start := Sep_Indexes(Sep_Indexes'Last) + 1;
+         Stop  := Tokens_Info'Last;
+         
+      else
+         Start := Sep_Indexes(Positive(S_Index) - 1) + 1;
+         Stop  := Sep_Indexes(Positive(S_Index)) - 1;
+      end if;
+      return Tokens_Info(Start .. Stop);
+   end Get_Token_Strings;
+   
+   function To_String (Tokens : in Token_Record_Array) return String is
+      S : String := "";
+   begin 
+      for I in Tokens'Range loop
+         S := S & Bound.To_String(Tokens(I).Value);
+      end loop;
+      return S;
+   end To_String;
+   
 
 end Shell.Tokenizer;

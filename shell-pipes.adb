@@ -86,11 +86,10 @@ package body Shell.Pipes is
                     " anything other than word tokens.");
          end if;
       end loop Check_For_Words;
-      T_IO.Put_Line("FD in parent is " & Target'Img);
-      Duplicate(Source_Descriptor, Target);
+
       P_ID := Exec.Fork;
       if Exec.Is_Child_Pid(P_ID) then
-         T_IO.Put_Line("FD in child is " & Target'Img);
+         Duplicate(Source_Descriptor, Target);
          Exec.Execute(Command);
       elsif Exec.Is_Parent_Pid(P_ID) then
          Exec.Waitpid(P_ID, 0, 0);

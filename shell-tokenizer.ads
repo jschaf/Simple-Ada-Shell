@@ -8,6 +8,7 @@
 -- Status          : Unknown, Use with caution!
 
 with Ada.Strings.Bounded;
+with Gnat.Array_Split;
 
 package Shell.Tokenizer is
 
@@ -33,26 +34,41 @@ package Shell.Tokenizer is
       Value : Bound.Bounded_String;
    end record;
 
-   subtype Token_Range is Integer range 1 .. MAX_WORD_LENGTH;
+   subtype Token_Range is Positive range 1 .. MAX_WORD_LENGTH;
 
-   type Token_Array is array (Token_Range range <>) of Token_Type;
-
+   type Token_Array is array (Positive range <>) of Token_Type;
+   
+   type Token_Set is array (Token_Type'range) of Boolean;
+   
    type Token_Record_Array is array (Token_Range range <>) of Token_Record;
 
    --  Take in a string and return an array of token_records.  Each
    --  record contains the Token_Type and a Bounded String containing
    --  the representation of the token.
    function Tokenize (Token_String : in String) return Token_Record_Array;
+   
+   --  Take in a string and return an array of Token_Type.  Similar to
+   --  tokenize except we do not include the strings.
+   function Tokenize_No_Strings 
+     (Token_String : in String) 
+     return Token_Array;
 
+   function Strip_Token_strings 
+     (Tokens : in token_record_array) 
+     return Token_array;
+     
+     
    --  Given tokens and a start index, return a contigous slice of the
-   --  array containing only word tokens, starting at start.
+   --  array containing only word tokens, starting at index start.
    function Group_Word_Tokens
      (Tokens : in Token_Record_Array;
       Start  : in Token_Range)
      return Token_Record_Array;
 
    procedure Put_Tokens(Tokens : in Token_Record_Array);
-
+   
+   procedure Put_Tokens(Tokens : in Token_Array);
+   
    type Token_Index_Array is array (Token_Range range <>) of Token_Range;
 
    function Get_Token_Indices
@@ -61,8 +77,8 @@ package Shell.Tokenizer is
      return Token_Index_Array;
 
    function Contains_Token
-     (Tokens : in Token_Record_Array;
-      Search_Token  : in Token_Type)
+     (Token     : in Token_Type;
+      Set_Token : in Token_Set)
      return Boolean;
    
    
