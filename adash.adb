@@ -49,7 +49,7 @@ begin
          Tokenizer.Put_Tokens(Tokens);
 
          if Exec.Is_Child_Pid(P_ID) then
-            --  Redirect.Set_Redirects(Tokens);
+            Redirect.Set_Redirects(Tokens);
             Exec.Execute_Piped_Command(Tokens);
          elsif Exec.Is_Parent_Pid(P_ID) then
             Exec.Waitpid(P_ID, 0, 0);
