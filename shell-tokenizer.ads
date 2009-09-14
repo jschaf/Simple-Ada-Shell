@@ -87,4 +87,24 @@ package Shell.Tokenizer is
       Tokens : in Token_Record_Array)
      return Boolean;
    
+   
+   function Array_To_Set (Tokens : in Token_Array) return Token_Set;
+   
+   package Split is new Gnat.Array_Split
+     (Element => Token_Type,
+      Element_Sequence => Token_Array,
+      Element_Set => Token_Set,
+      To_Set => Array_To_Set,
+      Is_In => Contains_Token);
+   
+   function Get_Token_Strings 
+     (S           : in Split.Slice_Set;
+      S_Index     : in Integer; 
+      Tokens_Info : in Token_Record_Array) 
+     return Token_Record_Array;
+
+   
+   function To_String (Tokens : in Token_Record_Array) return String;
+
+   
 end Shell.Tokenizer;
