@@ -18,7 +18,7 @@ package body Shell.Pipes is
    package Exec renames Shell.Execute;
 
    function Make_Pipe return Pipe_Descriptor is
-      PD_Array : C_Pipe_Descriptor := (others => -1);
+      PD_Array : C_Pipe_Descriptor := (others => 0);
       Pipe_Create_Error : exception;
    begin
       if C_Pipe(PD_Array) = -1 then
@@ -47,7 +47,19 @@ package body Shell.Pipes is
            & Errors.String_Error(Errors.Last_Error);
       end if;
    end Duplicate;
+   
+   function Duplicate (Old_FD : in File_Descriptor) return File_Descriptor is 
+      New_Fd : File_Descriptor := C_Dup(Old_FD);
+   begin 
+      if New_FD = -1 then
+         raise Duplicate_Exception with "Unable to duplicate: "
+           & Errors.String_Error(Errors.Last_Error);
+      end if;
+      return New_FD;
+   end Duplicate;
+   
 
+   
 
    procedure Execute_To_Pipe
      (Tokens            : in Tokenizer.Token_Record_Array;
@@ -74,10 +86,11 @@ package body Shell.Pipes is
                     " anything other than word tokens.");
          end if;
       end loop Check_For_Words;
-
+      T_IO.Put_Line("FD in parent is " & Target'Img);
+      Duplicate(Source_Descriptor, Target);
       P_ID := Exec.Fork;
       if Exec.Is_Child_Pid(P_ID) then
-         Duplicate(Source_Descriptor, Target);
+         T_IO.Put_Line("FD in child is " & Target'Img);
          Exec.Execute(Command);
       elsif Exec.Is_Parent_Pid(P_ID) then
          Exec.Waitpid(P_ID, 0, 0);
