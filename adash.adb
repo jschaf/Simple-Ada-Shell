@@ -35,18 +35,47 @@ procedure AdaSH is
                             new String'("ls -l | sort -r | head -n2"));
 begin
 
-   for i in Tests'range loop
+   --  for i in Tests'range loop
+   --     declare
+   --        Tokens : Tokenizer.Token_Record_Array
+   --          := Tokenizer.Tokenize(Tests(I).all);
+   --     begin
+   --        T_IO.Put_Line("Testing: " & Tests(I).all);
+   --        T_IO.Put_Line("==============================");
+   --        T_IO.New_Line;
+   --        P_ID := Exec.Fork;
+
+   --        T_IO.Put("Tokens: ");
+   --        Tokenizer.Put_Tokens(Tokens);
+
+   --        if Exec.Is_Child_Pid(P_ID) then
+   --           Redirect.Set_Redirects(Tokens);
+   --           Exec.Execute_Piped_Command(Tokens);
+   --        elsif Exec.Is_Parent_Pid(P_ID) then
+   --           Exec.Waitpid(P_ID, 0, 0);
+   --        else
+   --           T_IO.Put_Line(T_IO.Standard_Error,
+   --                         "Unable to create a new process.");
+   --        end if;
+
+   --     exception
+   --        when Error : others =>
+   --           T_IO.Put_Line(T_IO.Standard_Error,
+   --                         Except.Exception_Information(Error));
+
+   --     end;
+   --     T_IO.New_Line;
+
+   --  end loop;
+
+   
+   while True loop
       declare
          Tokens : Tokenizer.Token_Record_Array
-           := Tokenizer.Tokenize(Tests(I).all);
+           := Tokenizer.Tokenize(T_IO.Get_Line);
       begin
-         T_IO.Put_Line("Testing: " & Tests(I).all);
-         T_IO.Put_Line("==============================");
-         T_IO.New_Line;
+         Put_Prompt;
          P_ID := Exec.Fork;
-
-         T_IO.Put("Tokens: ");
-         Tokenizer.Put_Tokens(Tokens);
 
          if Exec.Is_Child_Pid(P_ID) then
             Redirect.Set_Redirects(Tokens);
@@ -68,7 +97,7 @@ begin
 
    end loop;
 
-
+   
 
 
 end AdaSH;
