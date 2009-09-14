@@ -3,6 +3,7 @@ with Ada.Exceptions;
 
 with Gnat.Array_Split;
 
+with Shell;
 with Shell.Tokenizer;
 with Shell.Redirection;
 with Shell.Execute;
@@ -16,7 +17,7 @@ procedure AdaSH is
    package Tokenizer renames Shell.Tokenizer;
    package Redirect renames Shell.Redirection;
    package Exec renames Shell.Execute;
-
+   package Pipes renames Shell.Pipes;
 
    procedure Put_Prompt (Prompt : String := "osShell$ ") is
    begin
@@ -33,8 +34,12 @@ procedure AdaSH is
                             new String'("ls -al"),
                             new String'("ls -l | sort -r"),
                             new String'("ls -l | sort -r | head -n2"));
+   
+   Test1 : Shell.File_Descriptor := 0;
+   Test2 : Shell.File_Descriptor := 1 ;
+   Blah : Integer := 0;
 begin
-
+   
    --  for i in Tests'range loop
    --     declare
    --        Tokens : Tokenizer.Token_Record_Array
@@ -67,15 +72,18 @@ begin
    --     T_IO.New_Line;
 
    --  end loop;
-
    
-   while True loop
+   
+   
+   
+   loop
+      Put_Prompt;
+      
       declare
          Tokens : Tokenizer.Token_Record_Array
            := Tokenizer.Tokenize(T_IO.Get_Line);
       begin
-         Put_Prompt;
-         P_ID := Exec.Fork;
+            P_ID := Exec.Fork;
 
          if Exec.Is_Child_Pid(P_ID) then
             Redirect.Set_Redirects(Tokens);
