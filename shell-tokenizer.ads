@@ -81,5 +81,10 @@ package Shell.Tokenizer is
       Set_Token : in Token_Set)
      return Boolean;
    
+
+   function Contains_Token
+     (Token  : in Token_Type;
+      Tokens : in Token_Record_Array)
+     return Boolean;
    
 end Shell.Tokenizer;
