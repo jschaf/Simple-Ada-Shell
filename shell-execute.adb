@@ -68,9 +68,6 @@ package body Shell.Execute is
       end if;
    end Execute;
 
-
-
-
    procedure Execute_Piped_Command (Tokens : in Token_Record_Array) is
       package Tok renames Tokenizer;
 
@@ -103,7 +100,7 @@ package body Shell.Execute is
       procedure Put_Delimits (T : in Tok.Token_Index_Array) is
       begin
          Put("Token_Index_Array[");
-         for i in T'range loop
+         for I in T'Range loop
             Put(T(I)'Img & ", ");
          end loop;
          Put_Line("]");
@@ -123,10 +120,10 @@ package body Shell.Execute is
                                    Delimit_Index : in Token_Range)
       is
          Has_Output_Redirection : Boolean
-           := (Tok.Contains_Token(Tokens, Tok.T_GT)
-                 or Tok.Contains_Token(Tokens, Tok.T_GTGT));
+           := (Tok.Contains_Token(Tok.T_GT, Tokens)
+                 or Tok.Contains_Token(Tok.T_GTGT, Tokens));
          Has_Input_Redirection : Boolean
-           := Tok.Contains_Token(Tokens, Tok.T_LT);
+           := Tok.Contains_Token(Tok.T_LT, Tokens);
       begin
          if Start > Stop then
             raise Malformed_Pipe_Exception with "Missing command for pipe.";
@@ -183,7 +180,36 @@ package body Shell.Execute is
       end loop;
    end Execute_Piped_Command;
 
+   
+   procedure Execute (Command_String : in String) is 
+      
+      Tokens          : Token_Record_Array := Tokenize(Command_String);
+      Stripped_Tokens : Token_Array        := Strip_Token_Strings(Tokens);
+      
+      Separator    : Token_Array := (1 => T_Bar);
+      Slices : Split.Slice_Set;
+      
 
+   begin 
+      Split.Create(S          => Slices,
+                   From       => Stripped_Tokens,
+                   Separators => Separator);
+      
+      for I in 1 .. Split.Slice_Count(Slices) loop
+         declare
+
+            Cmd_Info : Token_Record_Array
+              := Get_Token_Strings(Slices, Integer(I), Tokens);
+         begin
+            Put_Line("Executing: ");
+            Put_Tokens(Cmd_Info);
+            Execute(Cmd_Info);            
+         end;
+      end loop;
+
+   end Execute;
+   
+   
 
    function Is_Parent_Pid (PID : in Process_ID) return Boolean is
    begin

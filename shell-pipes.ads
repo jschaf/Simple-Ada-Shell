@@ -2,7 +2,7 @@ with Shell.Tokenizer;
 
 package Shell.Pipes is
 
-   package Tokenizer renames Shell.Tokenizer;
+   --  package Tokenizer renames Shell.Tokenizer;
 
    type Pipe_Descriptor is
       record
