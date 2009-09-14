@@ -1,0 +1,15 @@
+project Ada_Shell is
+
+   package Ide is
+      for Vcs_Kind use "Git";
+   end Ide;
+
+   for Object_Dir use "bin";
+   for Main use ("adash.adb");
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-A1", "-A2", "-A3", "-A4");
+   end Pretty_Printer;
+
+end Ada_Shell;
+

@@ -10,7 +10,7 @@
 with Ada.Strings.Bounded;
 
 package Shell.Tokenizer is
-   
+
    MAX_WORD_LENGTH : constant Positive := 256;
    package Bound is new Ada.Strings.Bounded.Generic_Bounded_Length
      (Max => MAX_WORD_LENGTH);
@@ -32,35 +32,38 @@ package Shell.Tokenizer is
       Token : Token_Type;
       Value : Bound.Bounded_String;
    end record;
-   
-   subtype Token_Range is Integer range 0 .. MAX_WORD_LENGTH;
-   
-   type Token_Array is array (Token_Range range <>) of Token_Record;
-   
+
+   subtype Token_Range is Integer range 1 .. MAX_WORD_LENGTH;
+
+   type Token_Array is array (Token_Range range <>) of Token_Type;
+
+   type Token_Record_Array is array (Token_Range range <>) of Token_Record;
+
    --  Take in a string and return an array of token_records.  Each
    --  record contains the Token_Type and a Bounded String containing
    --  the representation of the token.
-   function Tokenize (Token_String : in String) return Token_Array;
-   
+   function Tokenize (Token_String : in String) return Token_Record_Array;
+
    --  Given tokens and a start index, return a contigous slice of the
    --  array containing only word tokens, starting at start.
-   function Group_Word_Tokens 
-     (Tokens : in Token_Array;
+   function Group_Word_Tokens
+     (Tokens : in Token_Record_Array;
       Start  : in Token_Range)
-     return Token_Array;
-   
-   procedure Put_Tokens(Tokens : in Token_Array);
-   
+     return Token_Record_Array;
+
+   procedure Put_Tokens(Tokens : in Token_Record_Array);
+
    type Token_Index_Array is array (Token_Range range <>) of Token_Range;
-   
-   function Get_Token_Indices 
-     (Tokens : in Token_Array; 
-      Token  : in Token_Type := T_Bar) 
+
+   function Get_Token_Indices
+     (Tokens : in Token_Record_Array;
+      Token  : in Token_Type := T_Bar)
      return Token_Index_Array;
-   
-   function Contains_Token 
-     (Tokens : in Token_Array; 
-      Search_Token  : in Token_Type) 
+
+   function Contains_Token
+     (Tokens : in Token_Record_Array;
+      Search_Token  : in Token_Type)
      return Boolean;
+   
    
 end Shell.Tokenizer;

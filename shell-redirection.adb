@@ -74,36 +74,36 @@ package body Shell.Redirection is
 
    end Redirect;
 
-   
+
    --  Iterate through a Token_Array and set the stdin and stdout file
    --  descriptors.  Do some basic error checking.
    procedure Set_Redirects
-     (Tokens : in Token_Array)
+     (Tokens : in Token_Record_Array)
    is
-      
+
       Token_Info : Token_Record;
-      
+
       subtype T_Range is Token_Range range Tokens'Range;
-      
+
       Malformed_Redirect : exception;
-      
+
       function Get_Redirect_File(Index : in T_Range) return String is
       begin
          if Index = Tokens'Last then
             raise Malformed_Redirect with "Error: Missing file for redirection.";
-            return "";              
+            return "";
          end if;
-         
+
          if Tokens(Index + 1).Token /= T_Word then
-            raise Malformed_Redirect 
+            raise Malformed_Redirect
               with "Error: Redirection file is not a valid identifier.";
             return "";
          end if;
-         
+
          T_IO.Put_Line(Bound.To_String(Tokens(Index + 1).Value));
          return Bound.To_String(Tokens(Index + 1).Value);
       end Get_Redirect_File;
-      
+
    begin
       for I in Tokens'Range loop
          Token_Info := Tokens(I);
@@ -115,7 +115,7 @@ package body Shell.Redirection is
          -- index := index + 1;
       end loop;
    end Set_Redirects;
-   
+
    procedure Redirect_StdOut
      (Output_File       : in String;
       Redirection_Token : in Token_Type)
