@@ -1,3 +1,7 @@
+--  Use C primitives to execute a command.  This module handles
+--  commands with input/output redirection, pipes, and multiple
+--  commands on the same line with the semi-colon.
+
 with Shell.Tokenizer;
 
 package Shell.Execute is
