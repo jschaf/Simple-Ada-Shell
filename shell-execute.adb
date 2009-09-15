@@ -1,5 +1,7 @@
 with Ada.Characters.Latin_1;
 
+with Gnat.OS_Lib;
+
 with Interfaces.C;
 with Interfaces.C.Strings;
 
@@ -9,7 +11,9 @@ with Shell.Redirection;
 package body Shell.Execute is
    
    package Latin renames Ada.Characters.Latin_1;
-
+   
+   package OS renames Gnat.OS_Lib;
+   
    package C renames Interfaces.C;
    
    package Tok renames Tokenizer;
@@ -165,9 +169,12 @@ package body Shell.Execute is
          end loop;
       end Check_Tokens;
       
-      Temp_In_File  : constant String := ".pipefile_in";
-      Temp_Out_File : constant String := ".pipefile_out";
       
+      Temp_FD, Old_FD     : OS.File_Descriptor;
+      Temp_Name, Old_Name : OS.Temp_File_Name;
+      
+      Successful_Delete : Boolean;
+
    begin
       
       Check_Tokens;
@@ -181,13 +188,17 @@ package body Shell.Execute is
       
       Current_Pipe := Pipes.Make_Pipe;
       
+      OS.Create_Temp_File(Temp_FD, Temp_Name);
       
       for I in First_Slice .. Last_Slice loop
          
          declare           
             Piped_Tokens : Tok.Token_Record_Array
               := Tok.Get_Token_Strings(Slices, I, Tokens);
+            
             P_ID : Process_ID;
+            
+            Copy_Success : Boolean;
          begin
             
             P_ID := Fork;
@@ -195,36 +206,42 @@ package body Shell.Execute is
             if Is_Child_Pid(P_ID) then
                
                if I = First_Slice then
+                  
                   Check_Redirection(Piped_Tokens, First);
                   
-                  Redirection.Redirect_Stdout(Temp_Out_File);
-                  Execute(Piped_Tokens);
+                  Old_Name := Temp_Name;
+                  Put_Line(Standard_Error, "Writing to " & Temp_Name & ".");
                   
-                  --  Execute_To_Pipe(Piped_Tokens,
-                  --                  STDOUT_FD,
-                  --                  Current_Pipe.Write_End);
+                  Redirection.Redirect_Stdout(Temp_Name);
+                  Execute(Piped_Tokens);
                   
                elsif I = Last_Slice then
+                  
                   Check_Redirection(Piped_Tokens, Last);
                   
-                  Redirection.Redirect_StdIn(Temp_Out_File);
+                  Put_Line(Standard_Error, "Reading from " & Temp_Name & ".");
+                  
+                  Redirection.Redirect_StdIn(Temp_Name);
                   Execute(Piped_Tokens);
                   
-                  --  Execute_To_Pipe(Piped_Tokens,
-                  --                  STDIN_FD,
-                  --                  Last_Pipe.Read_End);
-
                else
+                  Put_Line("Middle");
+                  
                   Check_Redirection(Piped_Tokens, Middle);
                   
-                  Redirection.Redirect_StdOut(Temp_In_File);
-                  Redirection.Redirect_StdIn(Temp_Out_File);
+                  OS.Create_Temp_File(Old_FD, Old_Name);
+                  
+                  OS.Copy_File(Name     => Temp_Name, 
+                               Pathname => Old_Name,
+                               Success  => Copy_Success,
+                               Mode     => OS.Overwrite);
+                  
+                  Redirection.Redirect_StdIn(Old_Name);
+                  Redirection.Redirect_StdOut(Temp_Name);
+                  
                   Execute(Piped_Tokens);
                   
-                  --  Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
-                  --  Execute_To_Pipe(Piped_Tokens,
-                  --                  STDOUT_FD,
-                  --                  Current_Pipe.Write_End);
+                  OS.Close(Old_FD);
                   
                end if;
                
@@ -235,14 +252,10 @@ package body Shell.Execute is
                raise Fork_Exception with "Unable to fork new process.";
             end if;
                
-            Last_Pipe := Current_Pipe;
-            Current_Pipe := Pipes.Make_Pipe;
          end;
       end loop;
       
-      Remove(Temp_In_File);
-      Remove(Temp_Out_File);
-      
+      OS.Close(Temp_FD);
    end Execute_Piped_Command;
 
    
