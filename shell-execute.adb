@@ -80,11 +80,13 @@ package body Shell.Execute is
       
    end To_C_Args;
    
-   procedure Remove (Name : in string) is
+   procedure Remove (Name : in String) is
       C_Name : C.Strings.Chars_Ptr := C.Strings.New_String(Name);
    begin
       C_Remove(C_Name);
    end Remove;
+   
+   procedure Execute_Multiple_Command (Tokens : in Tok.Token_Record_Array);
    
    procedure Execute (Tokens : in Tok.Token_Record_Array) is
       
@@ -94,10 +96,19 @@ package body Shell.Execute is
       C_Args : C.Strings.Chars_Ptr_Array := To_C_Args(Words);
       
    begin
-      
-      if Tokens'First <= Tokens'Last then
+      if Tok.Contains_Token(Tok.T_Semi, Tokens) then
+         Execute_Multiple_Command(Tokens);
+         
+      elsif Tok.Contains_Token(Tok.T_Bar, Tokens) then
+         Execute_Piped_Command(Tokens);
+         
+      elsif Tokens'First <= Tokens'Last then
          Redirection.Set_Redirects(Tokens);
          Execvp(C_Args(C_Args'First), C_Args);
+         
+      else
+         null;
+         
       end if;
       
    end Execute;
@@ -138,8 +149,6 @@ package body Shell.Execute is
       Separator : constant Tok.Token_Array := (1 => Tok.T_Bar);
       Slices    : Tok.Split.Slice_Set;
 
-      Current_Pipe, Last_Pipe : Pipes.Pipe_Descriptor := Pipes.Make_Pipe;
-      
       First_Slice : constant Natural := 1;
       Last_Slice : Natural;
       
@@ -177,8 +186,12 @@ package body Shell.Execute is
 
    begin
       
-      Check_Tokens;
+      if not Tok.Contains_Token(Tok.T_Bar, Tokens) then
+         Execute(Tokens);
+         return;
+      end if;
       
+      Check_Tokens;
       
       Tok.Split.Create(S          => Slices,
                        From       => Stripped_Tokens,
@@ -186,13 +199,13 @@ package body Shell.Execute is
       
       Last_Slice := Natural(Tok.Split.Slice_Count(Slices));
       
-      Current_Pipe := Pipes.Make_Pipe;
-      
       OS.Create_Temp_File(Temp_FD, Temp_Name);
+      OS.Create_Temp_File(Old_FD, Old_Name);
       
       for I in First_Slice .. Last_Slice loop
          
          declare           
+            --  Get the specific slice we need
             Piped_Tokens : Tok.Token_Record_Array
               := Tok.Get_Token_Strings(Slices, I, Tokens);
             
@@ -207,41 +220,35 @@ package body Shell.Execute is
                
                if I = First_Slice then
                   
+                  --  Since its first, we only redirect stdout
                   Check_Redirection(Piped_Tokens, First);
-                  
-                  Old_Name := Temp_Name;
-                  Put_Line(Standard_Error, "Writing to " & Temp_Name & ".");
-                  
                   Redirection.Redirect_Stdout(Temp_Name);
                   Execute(Piped_Tokens);
                   
                elsif I = Last_Slice then
-                  
+                  --  For the last slice, we only redirect stdin
                   Check_Redirection(Piped_Tokens, Last);
-                  
-                  Put_Line(Standard_Error, "Reading from " & Temp_Name & ".");
-                  
                   Redirection.Redirect_StdIn(Temp_Name);
                   Execute(Piped_Tokens);
                   
                else
-                  Put_Line("Middle");
-                  
                   Check_Redirection(Piped_Tokens, Middle);
                   
-                  OS.Create_Temp_File(Old_FD, Old_Name);
-                  
+                  --  Create a different temp file so we can use
+                  --  Temp_File for Stdout.
                   OS.Copy_File(Name     => Temp_Name, 
                                Pathname => Old_Name,
                                Success  => Copy_Success,
                                Mode     => OS.Overwrite);
                   
+                  --  We need to redirect both because we are in
+                  --  between two pipes.
                   Redirection.Redirect_StdIn(Old_Name);
                   Redirection.Redirect_StdOut(Temp_Name);
                   
                   Execute(Piped_Tokens);
-                  
-                  OS.Close(Old_FD);
+
+
                   
                end if;
                
@@ -251,25 +258,59 @@ package body Shell.Execute is
             else
                raise Fork_Exception with "Unable to fork new process.";
             end if;
-               
          end;
       end loop;
       
-      OS.Close(Temp_FD);
+      OS.Delete_File(Temp_Name, Successful_Delete);
+      OS.Delete_File(Old_Name, Successful_Delete);
    end Execute_Piped_Command;
 
+   
+   procedure Execute_Multiple_Command (Tokens : in Tok.Token_Record_Array) is
+      Stripped_Tokens : Tok.Token_Array        
+        := Tok.Strip_Token_Strings(Tokens);
+      
+      Separator : constant Tok.Token_Array := (1 => Tok.T_Semi);
+      Slices    : Tok.Split.Slice_Set;
+
+      First_Slice : constant Natural := 1;
+      Last_Slice : Natural;
+      
+      P_ID : Process_ID;
+      
+   begin
+      Tok.Split.Create(S          => Slices,
+                       From       => Stripped_Tokens,
+                       Separators => Separator);
+      
+      Last_Slice := Natural(Tok.Split.Slice_Count(Slices));
+
+      for i in First_Slice .. Last_Slice loop
+         declare
+            Delimited_Tokens : Tok.Token_Record_Array
+              := Tok.Get_Token_Strings(Slices, I, Tokens);
+         begin
+            P_ID := Fork;
+            if Is_Child_Pid(P_ID) then
+               Tok.Put_Tokens(Delimited_Tokens);
+               Execute(Delimited_Tokens);
+            elsif Is_Parent_Pid(P_ID) then
+               Waitpid(P_ID, 0, 0);
+            else
+               raise Fork_Exception with "Unable to create new process.";
+            end if;
+            
+         end;
+      end loop;
+   end Execute_Multiple_Command;
    
    procedure Execute (Command_String : in String) is 
       
       Tokens   : Tok.Token_Record_Array := Tok.Tokenize(Command_String);
 
    begin 
+      Execute(Tokens);
       
-      if Tok.Contains_Token(Tok.T_Bar, Tokens) then
-         Execute_Piped_Command(Tokens);
-      else
-         Execute(Tokens);
-      end if;
    end Execute;
 
    function Is_Parent_Pid (PID : in Process_ID) return Boolean is
@@ -295,10 +336,10 @@ package body Shell.Execute is
       Command : Tokenizer.Token_Record_Array
         := Tokenizer.Group_Word_Tokens(Tokens, Tokens'First);
 
-      --  Use variable because Duplicate uses an out parameter
-      --  Target : File_Descriptor := Target_Descriptor;
    begin
-
+      
+      Target_Descriptor := 0;
+      
       P_ID := Fork;
       
       if Is_Child_Pid(P_ID) then

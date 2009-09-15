@@ -1,11 +1,15 @@
+--  A simple shell implemented in Ada.
+
+--  As of 14 Sep, the shell supports the following features:
+
+--  Basic commands, Input/Output Redirection, Pipes, and multiple
+--  commands delimited by the semi-colon.
+
 with Ada.Text_IO;
 with Ada.Exceptions;
 
-with Shell;
 with Shell.Tokenizer;
-with Shell.Redirection;
 with Shell.Execute;
-with Shell.Pipes;
 
 procedure AdaSH is
 
@@ -24,21 +28,26 @@ procedure AdaSH is
    
 begin
    
-   loop
+   Shell_Loop: Loop
       Put_Prompt;
       
+      Execute_Commands:
       declare
+         --  Grab the raw text from the console
          Cmd_String : String := T_IO.Get_Line;
          
          Tokens : Tokenizer.Token_Record_Array
            := Tokenizer.Tokenize(Cmd_String);
       begin
+         
          P_ID := Exec.Fork;
 
          if Exec.Is_Child_Pid(P_ID) then
             Exec.Execute(Cmd_String);
+            
          elsif Exec.Is_Parent_Pid(P_ID) then
             Exec.Waitpid(P_ID, 0, 0);
+            
          else
             T_IO.Put_Line(T_IO.Standard_Error,
                           "Unable to create a new process.");
@@ -49,10 +58,10 @@ begin
             T_IO.Put_Line(T_IO.Standard_Error,
                           Except.Exception_Message(Error));
 
-      end;
+      end Execute_Commands;
       T_IO.New_Line;
 
-   end loop;
+   end loop Shell_Loop;
 
    
 

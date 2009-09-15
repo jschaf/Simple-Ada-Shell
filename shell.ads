@@ -1,9 +1,5 @@
-with Ada.Text_IO; use Ada.Text_IO;
-with Ada.Integer_Text_IO; use Ada.Integer_Text_IO;
 package Shell is
-   --  pragma Pure;
-   package T_IO renames Ada.Text_IO;
-   package IT_IO renames Ada.Integer_Text_IO;
+   pragma Pure;
    
    subtype File_Descriptor is Integer;
    STDIN_FD  : constant File_Descriptor := 0;
