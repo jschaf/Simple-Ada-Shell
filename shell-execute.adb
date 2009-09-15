@@ -91,12 +91,11 @@ package body Shell.Execute is
 
       type Position_Type is (First, Middle, Last);
       
-      
-      procedure Check_Correctness (Tokens   : in Tok.Token_Record_Array;
+      procedure Check_Redirection (Tokens   : in Tok.Token_Record_Array;
                                    Position : in Position_Type)
       is
          Has_Output_Redirection : Boolean
-           :=      (Tok.Contains_Token(Tok.T_GT,   Tokens)
+           := (Tok.Contains_Token(Tok.T_GT,   Tokens)
                  or Tok.Contains_Token(Tok.T_GTGT, Tokens));
          
          Has_Input_Redirection : Boolean
@@ -104,7 +103,6 @@ package body Shell.Execute is
          
       begin
          
-
          if Position /= First and Has_Input_Redirection then
             raise Malformed_Pipe_Exception
               with ("Only the first pipe command can have input redirection.");
@@ -115,7 +113,7 @@ package body Shell.Execute is
               with ("Only the last pipe command can have output redirection.");
          end if;
          
-      end Check_Correctness;
+      end Check_Redirection;
       
       Stripped_Tokens : Tok.Token_Array        
         := Tok.Strip_Token_Strings(Tokens);
@@ -130,6 +128,7 @@ package body Shell.Execute is
       
       procedure Check_Tokens is
       begin
+         
          if Tokens(Tokens'First).Token = Tok.T_Bar then
             raise Malformed_Pipe_Exception
               with "Cannot begin a command with a pipe.";
@@ -141,23 +140,24 @@ package body Shell.Execute is
          end if;
             
          for I in Tokens'Range loop
+            
             if I + 1 in Tokens'Range 
               and then Tokens(I).Token = Tok.T_Bar
               and then Tokens(I).Token = Tokens(I+1).Token
+              
             then
                raise Malformed_Pipe_Exception
                  with "Cannot have two adjacent pipes.";
+               
             end if;
          end loop;
       end Check_Tokens;
 
-      
    begin
       
       Check_Tokens;
       
       Current_Pipe := Pipes.Make_Pipe;
-
       
       Tok.Split.Create(S          => Slices,
                        From       => Stripped_Tokens,
@@ -175,25 +175,26 @@ package body Shell.Execute is
          begin
             
             if I = First_Slice then
-               Check_Correctness(Piped_Tokens, First);
+               Check_Redirection(Piped_Tokens, First);
                
-               Pipes.Execute_To_Pipe(Piped_Tokens,
-                                     STDOUT_FD,
-                                     Current_Pipe.Write_End);
+               Execute_To_Pipe(Piped_Tokens,
+                               STDOUT_FD,
+                               Current_Pipe.Write_End);
+               
             elsif I = Last_Slice then
-               Check_Correctness(Piped_Tokens, Last);
+               Check_Redirection(Piped_Tokens, Last);
                
-               Pipes.Execute_To_Pipe(Piped_Tokens,
-                                     STDIN_FD,
-                                     Current_Pipe.Read_End);
+               Execute_To_Pipe(Piped_Tokens,
+                               STDIN_FD,
+                               Current_Pipe.Read_End);
 
             else
-               Check_Correctness(Piped_Tokens, Middle);
+               Check_Redirection(Piped_Tokens, Middle);
                
                Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
-               Pipes.Execute_To_Pipe(Piped_Tokens,
-                                     STDOUT_FD,
-                                     Current_Pipe.Write_End);
+               Execute_To_Pipe(Piped_Tokens,
+                               STDOUT_FD,
+                               Current_Pipe.Write_End);
             end if;
             Last_Pipe := Current_Pipe;
          end;
@@ -214,8 +215,6 @@ package body Shell.Execute is
          Execute(Tokens);
       end if;
    end Execute;
-   
-   
 
    function Is_Parent_Pid (PID : in Process_ID) return Boolean is
    begin
@@ -226,5 +225,37 @@ package body Shell.Execute is
    begin
       return Pid = 0;
    end Is_Child_Pid;
+   
+   procedure Execute_To_Pipe
+     (Tokens            : in Tokenizer.Token_Record_Array;
+      Source_Descriptor : in File_Descriptor;
+      Target_Descriptor : in File_Descriptor)
+   is
+      Fork_Exception : exception;
+      Bad_Token_Exception : exception;
 
+      P_ID : Process_ID;
+      
+      Command : Tokenizer.Token_Record_Array
+        := Tokenizer.Group_Word_Tokens(Tokens, Tokens'First);
+
+      --  Use variable because Duplicate uses an out parameter
+      Target : File_Descriptor := Target_Descriptor;
+   begin
+
+      P_ID := Fork;
+      
+      if Is_Child_Pid(P_ID) then
+         Pipes.Duplicate(Source_Descriptor, Target);
+         Execute(Command);
+         
+      elsif Is_Parent_Pid(P_ID) then
+         Waitpid(P_ID, 0, 0);
+         
+      else
+         raise Fork_Exception with "Unable to create new process.";
+      end if;
+   end Execute_To_Pipe;
+
+   
 end Shell.Execute;

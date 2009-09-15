@@ -239,39 +239,6 @@ package body Shell.Tokenizer is
       T_IO.Put_Line("]");
    end Put_Tokens;
 
-
-   
-   function Get_Token_Indices
-     (Tokens : in Token_Record_Array;
-      Token  : in Token_Type := T_Bar)
-     return Token_Index_Array
-   is
-      function Count_Tokens return Natural is
-         Total : Natural := 0;
-      begin
-         for I in Tokens'Range loop
-            if Tokens(I).Token = Token then
-               Total := Total + 1;
-            end if;
-         end loop;
-         return Total;
-      end Count_Tokens;
-
-      Length : constant Natural := Count_Tokens;
-      Indices : Token_Index_Array(Tokens'First
-                                      .. Tokens'First + Length - 1);
-
-      Current_Index : Token_Range := Tokens'First;
-   begin
-      for I in Tokens'Range loop
-         if Tokens(I).Token = Token then
-            Indices(Current_Index) := I;
-            Current_Index := Current_Index + 1;
-         end if;
-      end loop;
-      return Indices;
-   end Get_Token_Indices;
-
    function Contains_Token
      (Token     : in Token_Type;
       Set_Token : in Token_Set)
@@ -334,14 +301,4 @@ package body Shell.Tokenizer is
       return Tokens_Info(Start .. Stop);
    end Get_Token_Strings;
    
-   function To_String (Tokens : in Token_Record_Array) return String is
-      S : String := "";
-   begin 
-      for I in Tokens'Range loop
-         S := S & Bound.To_String(Tokens(I).Value);
-      end loop;
-      return S;
-   end To_String;
-   
-
 end Shell.Tokenizer;

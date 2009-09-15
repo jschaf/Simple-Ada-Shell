@@ -18,13 +18,4 @@ package Shell.Pipes is
    
    function Make_Pipe return Pipe_Descriptor;
 
-   --  Given a Token_Array with commands seperated by a Pipe, execute
-   --  the left side and pass the results to the right side using a
-   --  pipe.
-   procedure Execute_To_Pipe
-     (Tokens            : in Tokenizer.Token_Record_Array;
-      Source_Descriptor : in File_Descriptor;
-      Target_Descriptor : in File_Descriptor);
-
-
 end Shell.Pipes;

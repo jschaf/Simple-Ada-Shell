@@ -47,16 +47,9 @@ package Shell.Tokenizer is
    --  the representation of the token.
    function Tokenize (Token_String : in String) return Token_Record_Array;
    
-   --  Take in a string and return an array of Token_Type.  Similar to
-   --  tokenize except we do not include the strings.
-   function Tokenize_No_Strings 
-     (Token_String : in String) 
-     return Token_Array;
-
    function Strip_Token_strings 
      (Tokens : in token_record_array) 
      return Token_array;
-     
      
    --  Given tokens and a start index, return a contigous slice of the
    --  array containing only word tokens, starting at index start.
@@ -70,11 +63,6 @@ package Shell.Tokenizer is
    procedure Put_Tokens(Tokens : in Token_Array);
    
    type Token_Index_Array is array (Token_Range range <>) of Token_Range;
-
-   function Get_Token_Indices
-     (Tokens : in Token_Record_Array;
-      Token  : in Token_Type := T_Bar)
-     return Token_Index_Array;
 
    function Contains_Token
      (Token     : in Token_Type;
@@ -102,9 +90,6 @@ package Shell.Tokenizer is
       S_Index     : in Integer; 
       Tokens_Info : in Token_Record_Array) 
      return Token_Record_Array;
-
-   
-   function To_String (Tokens : in Token_Record_Array) return String;
 
    
 end Shell.Tokenizer;

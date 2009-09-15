@@ -57,46 +57,5 @@ package body Shell.Pipes is
       end if;
       return New_FD;
    end Duplicate;
-   
-
-   
-
-   procedure Execute_To_Pipe
-     (Tokens            : in Tokenizer.Token_Record_Array;
-      Source_Descriptor : in File_Descriptor;
-      Target_Descriptor : in File_Descriptor)
-   is
-      Fork_Exception : exception;
-      Bad_Token_Exception : exception;
-
-      P_ID : Exec.Process_ID;
-      Command : Tokenizer.Token_Record_Array
-        := Tokenizer.Group_Word_Tokens(Tokens, Tokens'First);
-
-      --  Use variable because Duplicate uses an out parameter
-      Target : File_Descriptor := Target_Descriptor;
-   begin
-
-      Check_For_Words:
-      for i in Tokens'Range loop
-         if Tokens(I).Token /= Tokenizer.T_Word then
-            Tokenizer.Put_Tokens(Tokens); --  DEBUG
-            raise Bad_Token_Exception
-              with ("Cannot execute command with" &
-                    " anything other than word tokens.");
-         end if;
-      end loop Check_For_Words;
-
-      P_ID := Exec.Fork;
-      if Exec.Is_Child_Pid(P_ID) then
-         Duplicate(Source_Descriptor, Target);
-         Exec.Execute(Command);
-      elsif Exec.Is_Parent_Pid(P_ID) then
-         Exec.Waitpid(P_ID, 0, 0);
-      else
-         raise Fork_Exception with "Unable to create new process.";
-      end if;
-   end Execute_To_Pipe;
-
 
 end Shell.Pipes;
