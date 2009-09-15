@@ -43,36 +43,47 @@ package body Shell.Redirection is
       function Assign_FD return File_Descriptor is
       begin
          case Redirection_Token is
-            when Tok.T_LT          => return STDIN_FD;
+            when Tok.T_LT              => return STDIN_FD;
             when Tok.T_GT | Tok.T_GTGT => return STDOUT_FD;
-            when others        => return -1;
+            when others                => return -1;
          end case;
       end Assign_FD;
 
-      Dst_FD : File_Descriptor := Assign_FD;
+      Original_FD, Dest_FD : File_Descriptor := Assign_FD;
 
       File_Sys_Failure : exception;
+      
       Destination_File : C.Strings.Chars_Ptr
         := C.Strings.New_String(File_Name);
+      
       File_Access_Flag : constant Integer := Assign_Flag;
 
-   begin  --  Redirect_StdOut
+   begin
       
-      -- Close stdout (freeing file descriptor 1)
-      if C_Close(Dst_FD) = -1 then
-         raise File_Sys_Failure
-           with "Cannot close stdout.";
+      -- Close the FD which also releases it
+      if C_Close(Dest_FD) = -1 then
+         if Dest_Fd = STDIN_FD then
+            raise File_Sys_Failure with "Cannot close stdin.";
+            
+         elsif Dest_FD = STDOUT_FD then
+            raise File_Sys_Failure with "Cannot close stdout.";
+            
+         else
+            raise File_Sys_Failure 
+              with "Cannot close file descriptor " & Dest_FD'Img;
+         end if;
       end if;
       
-      -- Open the output file (should be file descriptor 1)
-      Dst_Fd := C_Open(Destination_File, File_Access_Flag, 8#666#);
-
-      if Dst_Fd = -1 then
+      -- Open the output file (should be either file descriptor 0 or 1)
+      Dest_Fd := C_Open(Destination_File, File_Access_Flag, 8#666#);
+      
+      if Dest_Fd = -1 then
          raise File_Sys_Failure
            with "Cannot open " & File_Name & ".";
       end if;
+      
       -- Make sure the redirection occurred.
-      if Dst_Fd /= 1 then
+      if Dest_fd /= Original_FD then
          raise Malformed_Redirect 
            with "Stdout improperly redirected.";
       end if;
@@ -120,20 +131,14 @@ package body Shell.Redirection is
       end loop;
    end Set_Redirects;
 
-   procedure Redirect_StdOut
-     (Output_File       : in String;
-      Redirection_Token : in Tok.Token_Type)
-   is
+   procedure Redirect_StdOut (Output_File : in String) is
    begin
-      Redirect(Output_File, Redirection_Token);
+      Redirect(Output_File, Tok.T_GT);
    end Redirect_StdOut;
 
-   procedure Redirect_StdIn
-     (Input_File        : in String;
-      Redirection_Token : in Tok.Token_Type)
-   is
+   procedure Redirect_StdIn (Input_File : in String) is
    begin
-      Redirect(Input_File, Redirection_Token);
+      Redirect(Input_File, Tok.T_LT);
    end Redirect_StdIn;
 
 end Shell.Redirection;

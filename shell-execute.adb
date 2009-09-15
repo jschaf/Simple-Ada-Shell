@@ -7,7 +7,7 @@ with Shell.Pipes;
 with Shell.Redirection;
 
 package body Shell.Execute is
-
+   
    package Latin renames Ada.Characters.Latin_1;
 
    package C renames Interfaces.C;
@@ -23,7 +23,12 @@ package body Shell.Execute is
    begin
       return C_Fork;
    end Fork;
-
+   
+   Fork_Exception : exception;
+   
+   procedure C_Remove (Name : in C.Strings.Chars_Ptr);
+   pragma Import(C, C_Remove, "remove");
+      
    procedure C_Waitpid (Pid     : in Process_ID;
                         StatLoc : in Integer;
                         Options : in Integer);
@@ -40,7 +45,9 @@ package body Shell.Execute is
    procedure Execvp(File : in C.Strings.Chars_Ptr;
                     Args : in C.Strings.Chars_Ptr_Array);
    pragma Import(C, Execvp, "execvp");
-
+   
+   --  Convert a Token_Record_Array to a C style array for use with
+   --  the execvp procedure.
    function To_C_Args
      (Args : in Tok.Token_Record_Array)
      return C.Strings.Chars_Ptr_Array
@@ -68,7 +75,13 @@ package body Shell.Execute is
       return C_Args;
       
    end To_C_Args;
-
+   
+   procedure Remove (Name : in string) is
+      C_Name : C.Strings.Chars_Ptr := C.Strings.New_String(Name);
+   begin
+      C_Remove(C_Name);
+   end Remove;
+   
    procedure Execute (Tokens : in Tok.Token_Record_Array) is
       
       Words : Tok.Token_Record_Array 
@@ -144,7 +157,6 @@ package body Shell.Execute is
             if I + 1 in Tokens'Range 
               and then Tokens(I).Token = Tok.T_Bar
               and then Tokens(I).Token = Tokens(I+1).Token
-              
             then
                raise Malformed_Pipe_Exception
                  with "Cannot have two adjacent pipes.";
@@ -152,12 +164,14 @@ package body Shell.Execute is
             end if;
          end loop;
       end Check_Tokens;
-
+      
+      Temp_In_File  : constant String := ".pipefile_in";
+      Temp_Out_File : constant String := ".pipefile_out";
+      
    begin
       
       Check_Tokens;
       
-      Current_Pipe := Pipes.Make_Pipe;
       
       Tok.Split.Create(S          => Slices,
                        From       => Stripped_Tokens,
@@ -165,41 +179,70 @@ package body Shell.Execute is
       
       Last_Slice := Natural(Tok.Split.Slice_Count(Slices));
       
+      Current_Pipe := Pipes.Make_Pipe;
+      
+      
       for I in First_Slice .. Last_Slice loop
          
          declare           
-            
             Piped_Tokens : Tok.Token_Record_Array
               := Tok.Get_Token_Strings(Slices, I, Tokens);
-            
+            P_ID : Process_ID;
          begin
             
-            if I = First_Slice then
-               Check_Redirection(Piped_Tokens, First);
+            P_ID := Fork;
+            
+            if Is_Child_Pid(P_ID) then
                
-               Execute_To_Pipe(Piped_Tokens,
-                               STDOUT_FD,
-                               Current_Pipe.Write_End);
-               
-            elsif I = Last_Slice then
-               Check_Redirection(Piped_Tokens, Last);
-               
-               Execute_To_Pipe(Piped_Tokens,
-                               STDIN_FD,
-                               Current_Pipe.Read_End);
+               if I = First_Slice then
+                  Check_Redirection(Piped_Tokens, First);
+                  
+                  Redirection.Redirect_Stdout(Temp_Out_File);
+                  Execute(Piped_Tokens);
+                  
+                  --  Execute_To_Pipe(Piped_Tokens,
+                  --                  STDOUT_FD,
+                  --                  Current_Pipe.Write_End);
+                  
+               elsif I = Last_Slice then
+                  Check_Redirection(Piped_Tokens, Last);
+                  
+                  Redirection.Redirect_StdIn(Temp_Out_File);
+                  Execute(Piped_Tokens);
+                  
+                  --  Execute_To_Pipe(Piped_Tokens,
+                  --                  STDIN_FD,
+                  --                  Last_Pipe.Read_End);
 
-            else
-               Check_Redirection(Piped_Tokens, Middle);
+               else
+                  Check_Redirection(Piped_Tokens, Middle);
+                  
+                  Redirection.Redirect_StdOut(Temp_In_File);
+                  Redirection.Redirect_StdIn(Temp_Out_File);
+                  Execute(Piped_Tokens);
+                  
+                  --  Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
+                  --  Execute_To_Pipe(Piped_Tokens,
+                  --                  STDOUT_FD,
+                  --                  Current_Pipe.Write_End);
+                  
+               end if;
                
-               Pipes.Duplicate(STDIN_FD, Last_Pipe.Read_End);
-               Execute_To_Pipe(Piped_Tokens,
-                               STDOUT_FD,
-                               Current_Pipe.Write_End);
+            elsif Is_Parent_Pid(P_ID) then
+               Waitpid(P_ID, 0, 0);
+               
+            else
+               raise Fork_Exception with "Unable to fork new process.";
             end if;
+               
             Last_Pipe := Current_Pipe;
+            Current_Pipe := Pipes.Make_Pipe;
          end;
       end loop;
-
+      
+      Remove(Temp_In_File);
+      Remove(Temp_Out_File);
+      
    end Execute_Piped_Command;
 
    
@@ -227,11 +270,11 @@ package body Shell.Execute is
    end Is_Child_Pid;
    
    procedure Execute_To_Pipe
-     (Tokens            : in Tokenizer.Token_Record_Array;
-      Source_Descriptor : in File_Descriptor;
-      Target_Descriptor : in File_Descriptor)
+     (Tokens            : in     Tokenizer.Token_Record_Array;
+      Source_Descriptor : in     File_Descriptor;
+      Target_Descriptor :    out File_Descriptor)
    is
-      Fork_Exception : exception;
+
       Bad_Token_Exception : exception;
 
       P_ID : Process_ID;
@@ -240,13 +283,13 @@ package body Shell.Execute is
         := Tokenizer.Group_Word_Tokens(Tokens, Tokens'First);
 
       --  Use variable because Duplicate uses an out parameter
-      Target : File_Descriptor := Target_Descriptor;
+      --  Target : File_Descriptor := Target_Descriptor;
    begin
 
       P_ID := Fork;
       
       if Is_Child_Pid(P_ID) then
-         Pipes.Duplicate(Source_Descriptor, Target);
+         Pipes.Duplicate(Source_Descriptor, Target_Descriptor);
          Execute(Command);
          
       elsif Is_Parent_Pid(P_ID) then
